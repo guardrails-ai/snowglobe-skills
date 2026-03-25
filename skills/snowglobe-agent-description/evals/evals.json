@@ -1,0 +1,30 @@
+{
+  "skill_name": "snowglobe-agent-description",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Write a Snowglobe description for my airline customer support agent. The entry point is chatbot_wrapper.py in the python-backend directory.",
+      "expected_output": "A 2-4 sentence Snowglobe-ready description scoped to the full triage/orchestrator level, covering the breadth of airline support topics (flight status, rebooking, seats, baggage, compensation), describing users as travelers, and avoiding technical details.",
+      "files": [
+        "/Users/shreyarajpal/openai-cs-agents-demo/python-backend/chatbot_wrapper.py",
+        "/Users/shreyarajpal/openai-cs-agents-demo/python-backend/airline/agents.py"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "I want to simulate just the refunds and compensation agent in Snowglobe — write me a description for it. The agent is in python-backend/airline/agents.py.",
+      "expected_output": "A 2-4 sentence description scoped narrowly to the refunds/compensation subagent — covering disrupted travelers seeking reimbursement/hotel/meal support, the agent's tools (issue_compensation, faq_lookup), and its boundaries (hands off to FAQ or Triage for other needs).",
+      "files": [
+        "/Users/shreyarajpal/openai-cs-agents-demo/python-backend/airline/agents.py"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Help me write a Snowglobe chatbot description for this project. The code is in python-backend/.",
+      "expected_output": "Claude should ask a clarifying question about which agent to simulate before writing a description, since there are multiple agents in the codebase (triage, booking, seats, FAQ, refunds, flight info).",
+      "files": [
+        "/Users/shreyarajpal/openai-cs-agents-demo/python-backend/airline/agents.py"
+      ]
+    }
+  ]
+}
