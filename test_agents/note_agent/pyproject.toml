@@ -1,0 +1,13 @@
+[project]
+name = "note_agent"
+version = "0.1.0"
+description = "Three-tool note taking agent (src layout, in-memory store)"
+requires-python = ">=3.9"
+dependencies = ["anthropic>=0.39"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

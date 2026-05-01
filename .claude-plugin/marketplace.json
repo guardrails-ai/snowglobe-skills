@@ -1,0 +1,16 @@
+{
+  "name": "snowglobe-skills",
+  "description": "Claude Code skills for bootstrapping, validating, and fixing Snowglobe agents",
+  "owner": {
+    "name": "Guardrails AI",
+    "email": "contact@guardrailsai.com",
+    "url": "https://guardrailsai.com/snowglobe"
+  },
+  "plugins": [
+    {
+      "name": "snowglobe-skills",
+      "source": "./plugins/snowglobe-skills",
+      "description": "Bootstrap, describe, validate, and auto-fix Snowglobe agents end-to-end. Includes four skills that auto-trigger by user intent."
+    }
+  ]
+}

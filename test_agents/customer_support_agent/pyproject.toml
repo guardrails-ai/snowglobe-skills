@@ -1,0 +1,14 @@
+[project]
+name = "customer_support_agent"
+version = "0.1.0"
+description = "Eight-tool customer support agent with pydantic models"
+requires-python = ">=3.9"
+dependencies = ["pydantic>=2.0", "openai>=1.0"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["customer_support_agent*"]
