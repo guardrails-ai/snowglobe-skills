@@ -1,0 +1,14 @@
+[project]
+name = "dictionary_agent"
+version = "0.1.0"
+description = "Two-tool dictionary agent (define + synonyms)"
+requires-python = ">=3.9"
+dependencies = ["anthropic>=0.39"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["dictionary_agent*"]

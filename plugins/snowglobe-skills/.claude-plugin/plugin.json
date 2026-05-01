@@ -1,0 +1,18 @@
+{
+  "name": "snowglobe-skills",
+  "version": "0.1.0",
+  "description": "Claude Code skills for bootstrapping, validating, and fixing Snowglobe agents. Bundles four skills that auto-trigger by user intent: bootstrap-snowglobe-agent, snowglobe-agent-description, validate-snowglobe-agent, and analyze-fix-snowglobe-agent.",
+  "author": {
+    "name": "Guardrails AI",
+    "email": "contact@guardrailsai.com",
+    "url": "https://guardrailsai.com/snowglobe"
+  },
+  "homepage": "https://guardrailsai.com/snowglobe/docs",
+  "license": "Apache-2.0",
+  "keywords": [
+    "snowglobe",
+    "agent-simulation",
+    "ai-testing",
+    "guardrails"
+  ]
+}

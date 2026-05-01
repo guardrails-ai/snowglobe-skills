@@ -1,0 +1,13 @@
+[project]
+name = "weather_agent"
+version = "0.1.0"
+description = "Five-tool weather agent (mockable HTTP backend)"
+requires-python = ">=3.9"
+dependencies = ["requests>=2.28", "litellm>=1.40"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
