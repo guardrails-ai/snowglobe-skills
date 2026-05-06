@@ -1,6 +1,10 @@
 ---
-name: "app-description-writer"
-description: "Use when writing or revising app descriptions across arbitrary applications."
+name: app-description-writer
+description: >
+  Writes or revises app descriptions for Snowglobe simulation fixtures across arbitrary
+  applications. Trigger when the user asks to write an app description, draft application
+  context, define target users and workflows, or prepare seed-data guidance for realistic
+  persona and scenario generation.
 ---
 
 # App Description Writer
