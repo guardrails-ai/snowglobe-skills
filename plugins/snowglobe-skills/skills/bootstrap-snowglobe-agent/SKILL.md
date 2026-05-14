@@ -342,6 +342,19 @@ framework or LLM provider. Signals to look for:
 - Domain vocabulary — what the app is for (airline reservations, pizza ordering, HR helpdesk, etc.)
 - README / docstrings / comments that describe who the bot is for and what it doesn't do
 
+**Widget signals** (only relevant if the agent emits interactive UI elements
+in its responses — buttons, dropdowns, multi-pick lists, free-text inputs):
+- Code that returns or yields a `widgets` / `actions` / `quick_replies` list
+  alongside the response text
+- Frontend component names mentioned in the agent code: `Button`, `Select`,
+  `Dropdown`, `MultiSelect`, `Checkbox`, `RadioGroup`, `Form`, `Input` etc.
+- Branching logic on a "user clicked X" payload — schemas with `widget_id` /
+  `action` / `option_id` shapes
+- Server endpoints that handle callback payloads from interactive messages
+
+If you find these, plan to wire widgets in Step 8 (see "Surfacing inline
+widgets"). If not, skip the widget block — most agents are text-only.
+
 Lift names, schemas, and implementations from the project rather than inventing placeholders.
 If the project already has an LLM client/model the user is committed to, prefer it over the
 default `init` template.
@@ -704,6 +717,127 @@ Every entry must have:
 - `"parameters"` with `"type": "object"`, `"properties"`, and `"required"` (empty list OK)
 - `"returns"` block describing the return shape — Snowglobe uses this to generate mock outputs
 - At least one `"examples"` entry with realistic `"input"` and `"output"`
+
+### Surfacing inline widgets (only if the agent emits them)
+
+**Skip this section unless Step 4 turned up widget signals.** Most agents
+return plain text and don't need any of this.
+
+If the agent renders interactive UI elements alongside its text response
+(buttons, selects, multi-selects, free-text inputs), Snowglobe can simulate
+real users clicking / picking / filling them. The contract:
+
+- The customer's `completion()` may return `widgets=[Interaction(...)]` on
+  `CompletionFunctionOutputs`. Snowglobe shows the persona those widgets,
+  decides whether and how to interact based on each `description`, and
+  sends the resulting `WidgetAction[]` back on the next turn.
+- On that next turn, `completion()` receives those actions on
+  `request.widget_actions` (typed list, may be empty).
+- Optionally, when a widget click maps to a literal user phrase (e.g. an
+  *Escalate to human* button really meaning the text `ESCALATE_TO_HUMAN`),
+  set `CompletionFunctionOutputs.user_content` to rewrite the recorded
+  user turn — downstream tools and reports see the canonical text.
+
+**Imports** (add when widgets are involved):
+
+```python
+from snowglobe.client import (
+    CompletionRequest, CompletionFunctionOutputs,
+    Interaction, Button, Select, MultiSelect, Input, WidgetChoice,
+)
+```
+
+**Four widget kinds in v1**, mapped to the action the persona produces:
+
+| Widget        | Action emitted | Required field on `WidgetAction`         |
+| ------------- | -------------- | ---------------------------------------- |
+| `Button`      | `click`        | (none)                                   |
+| `Select`      | `select_one`   | `option_id`                              |
+| `MultiSelect` | `select_many`  | `option_ids` (`[]` clears)               |
+| `Input`       | `set_text`     | `text_value` (`""` clears)               |
+
+**Two key rules:**
+
+1. **`description` drives the simulator.** Every `Interaction.description`,
+   `widget.description`, and `WidgetChoice.description` is read by the
+   persona generator. Write them like prompts to a real human — what the
+   widget does, when to use it, how to interpret the choices. Vague
+   descriptions = unrealistic widget interactions.
+2. **Widget IDs come from production code.** Mirror the real `id` strings
+   the customer's branching logic already keys off — don't invent new
+   ones. If the user already calls a button `"talk_to_human"` in their
+   app, use that exact id.
+
+**Wrapper pattern.** Augment `completion()` to (a) handle inbound
+`widget_actions`, (b) coerce the customer's emitted UI into `Interaction`
+objects, (c) return them on the typed output:
+
+```python
+def completion(request: CompletionRequest) -> CompletionFunctionOutputs:
+    # 1. React to any widget actions the persona took on the previous turn.
+    inserted_user_content = None
+    for action in request.widget_actions:
+        if action.widget_id == "renew_card":
+            # ... fire RENEW_CARD_TOOL or whatever the prod handler does
+            ...
+        elif action.widget_id == "escalate":
+            inserted_user_content = "ESCALATE_TO_HUMAN"
+
+    # 2. Run the existing completion pipeline (LLM call, tool loop, etc.)
+    response = your_completion_cycle(request)
+
+    # 3. Coerce any widgets the agent's UI layer emitted into Snowglobe types.
+    interactions = [_to_snowglobe_interaction(g) for g in (response.widget_groups or [])]
+
+    return CompletionFunctionOutputs(
+        response=response.text,
+        widgets=interactions or None,
+        user_content=inserted_user_content,
+    )
+
+
+def _to_snowglobe_interaction(group):
+    return Interaction(
+        id=group.id,
+        blocking=group.blocking,           # True for forms gated by Submit; False for one-off buttons
+        title=group.title,
+        description=group.description,
+        widgets=[_to_snowglobe_widget(w) for w in group.widgets],
+    )
+
+
+def _to_snowglobe_widget(w):
+    if w.kind == "button":
+        return Button(id=w.id, label=w.label, description=w.description)
+    if w.kind == "select":
+        return Select(
+            id=w.id, label=w.label, description=w.description,
+            choices=[WidgetChoice(id=c.id, label=c.label) for c in w.choices],
+        )
+    if w.kind == "multiselect":
+        return MultiSelect(
+            id=w.id, label=w.label, description=w.description,
+            choices=[WidgetChoice(id=c.id, label=c.label) for c in w.choices],
+        )
+    if w.kind == "input":
+        return Input(id=w.id, label=w.label, description=w.description, placeholder=w.placeholder)
+    raise ValueError(f"Unsupported widget kind: {w.kind}")
+```
+
+**`blocking` semantics:** set `blocking=True` for form-style interactions
+where the customer's UI gates the next turn behind a submit click — the
+persona stages select / input changes and only commits a turn when it
+clicks a button. Set `blocking=False` for one-off buttons that don't
+gate the next turn (the persona may act whenever the moment fits).
+
+**Empty-prompt turns are legal.** A turn whose only "input" was a widget
+click carries `request.messages[-1].content == ""` plus non-empty
+`request.widget_actions`. Don't gate logic on `if request.messages[...].content`
+alone — also check `request.widget_actions`.
+
+**No widgets → no changes.** If `response.widget_groups` is empty, return
+`widgets=None` and the wrapper PUT to control plane is byte-identical to
+the pre-widgets behavior. Existing customers see no diff.
 
 ---
 

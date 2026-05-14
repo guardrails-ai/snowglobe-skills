@@ -63,6 +63,14 @@ A Snowglobe agent description should be at least **2–4 sentences** that cover:
 3. **What kinds of requests it handles** — be specific about task types, not just topics
 4. **Where it draws the line** — what it escalates or can't help with (helps Snowglobe generate edge cases)
 
+**If the agent renders interactive widgets** (buttons, selects, multi-selects,
+inputs in the response — not background tools), mention them. Snowglobe can
+simulate clicks, picks, multi-picks, and text-fills against widget interactions,
+so naming them lets the persona generator exercise those branches. One sentence
+is plenty:
+> "The agent surfaces inline buttons for common next actions (e.g. *Renew card*,
+> *Talk to a human*) and form widgets for structured updates."
+
 ### Calibrating scope to the simulation level
 
 **Full system / orchestrator**: Describe the complete surface area. Users arrive with a wide range
