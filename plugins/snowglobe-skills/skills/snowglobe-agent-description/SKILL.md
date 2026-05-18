@@ -3,10 +3,15 @@ name: snowglobe-agent-description
 description: >
   Writes effective agent descriptions for Snowglobe, the simulation platform that stress-tests AI agents
   by generating synthetic user interactions. Use this skill whenever the user wants to write, improve,
-  or generate a Snowglobe chatbot description — including when they say things like "write a description
-  for Snowglobe", "help me set up simulation for my agent", "write a chatbot description for testing",
-  or "I want to simulate [agent name] in Snowglobe". Also trigger when the user is configuring a
-  chatbot_wrapper.py or agents.json for Snowglobe and needs a description field.
+  or generate a **Snowglobe** chatbot description.
+
+  **Only trigger when the request explicitly mentions Snowglobe (or simulation/testing of an
+  agent in the Snowglobe sense).** Ignore generic "write a description for my agent" or "describe
+  my chatbot" phrasing — those may belong to other plugins. Valid triggers: "write a description
+  for Snowglobe", "write a snowglobe chatbot description", "describe my agent for snowglobe
+  simulation", "I want to simulate [agent name] in Snowglobe". Also trigger when the user is
+  configuring a snowglobe chatbot_wrapper.py or .snowglobe/agents.json and needs a description
+  field.
 ---
 
 # Snowglobe Agent Description Writer

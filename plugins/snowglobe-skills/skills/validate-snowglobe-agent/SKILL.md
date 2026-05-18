@@ -2,8 +2,12 @@
 name: validate-snowglobe-agent
 description: >
   Validates a target snowglobe_agent.py by running a suite of code-based validation scripts.
-  Trigger when the user says "validate my agent", "run validation on my agent", "check my
-  snowglobe agent", or similar requests to verify a Snowglobe agent file is correct.
+
+  **Only trigger when the request explicitly mentions Snowglobe or a snowglobe_agent.py /
+  .snowglobe/ file.** Ignore generic "validate my agent" / "check my agent" / "run agent
+  validators" phrasing — other plugins may also have agent-validation skills. Valid triggers:
+  "validate my snowglobe agent", "run snowglobe validators", "check my snowglobe_agent.py",
+  "validate my .snowglobe wrapper".
 ---
 
 # Validate Snowglobe Agent
