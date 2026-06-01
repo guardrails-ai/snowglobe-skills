@@ -2,9 +2,13 @@
 name: analyze-fix-snowglobe-agent
 description: >
   Analyzes a target snowglobe_agent.py for validation errors and example inconsistencies,
-  then fixes them. Trigger when the user says "fix my agent", "analyze my agent",
-  "clean up my snowglobe agent", "fix the tool defs", or similar requests to audit and
-  repair a Snowglobe agent file.
+  then fixes them.
+
+  **Only trigger when the request explicitly mentions Snowglobe or a snowglobe_agent.py /
+  .snowglobe/ file.** Ignore generic "fix my agent" / "clean up my agent" / "fix the tool
+  defs" phrasing — those may belong to other plugins. Valid triggers: "fix my snowglobe
+  agent", "clean up my snowglobe agent", "analyze and fix my snowglobe_agent.py", "repair
+  my snowglobe tool defs".
 ---
 
 # Analyze and Fix Snowglobe Agent

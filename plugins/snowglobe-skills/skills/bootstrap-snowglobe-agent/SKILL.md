@@ -8,10 +8,15 @@ description: >
   description, augments the wrapper with `@snowglobe_tool` decorated functions, a `tool_defs()`
   function, `TOOLS_MAP`, and a tool-call loop in `completion()`, verifies with `snowglobe-connect
   test`, starts the wrapper with `snowglobe-connect start`, and hands the user a dashboard deep
-  link. Trigger when the user says "set up snowglobe for my project", "bootstrap my snowglobe
-  agent", "get started with snowglobe", "create a snowglobe agent", "connect my chatbot to
-  snowglobe", "scaffold my agent", "add tools to my agent", or any similar bootstrap / onboarding
-  request.
+  link.
+
+  **Only trigger when the request explicitly mentions Snowglobe.** Ignore generic agent /
+  chatbot / scaffolding phrasing that doesn't mention Snowglobe — other plugins may also handle
+  agents and the user could mean one of those. Valid triggers: "set up snowglobe for my
+  project", "bootstrap my snowglobe agent", "get started with snowglobe", "create a snowglobe
+  agent", "connect my chatbot to snowglobe (for simulation/testing)", "scaffold my snowglobe
+  agent", "add tools to my snowglobe agent". Do NOT trigger on bare "scaffold my agent",
+  "set up my chatbot", "add tools to my agent", etc.
 ---
 
 # Bootstrap Snowglobe Agent
@@ -50,11 +55,12 @@ skill is the consent.
 A good preamble for a from-scratch run looks like:
 
 > Here's the plan:
+> 0. **Pick the target agent** — if this repo has multiple agents, I'll ask which one (skipped if there's only one or you've already named a file)
 > 1. **Install `snowglobe`** (pip) — needed for the CLI
 > 2. **Authenticate** with `snowglobe-connect auth` — opens a browser briefly (skipping if you're already authed)
 > 3. **Register the agent** — I'll ask whether you want a new agent (created via the Snowglobe API) or an existing one from your dashboard, then run `snowglobe-connect init` to wire it up locally
 > 4. **Scan your project** to find existing tools, system prompts, and LLM client
-> 5. **Draft a chatbot description** for your dashboard (I'll ask about gaps; feel free to skip)
+> 5. **Draft a chatbot description** for your dashboard (I'll ask about gaps; feel free to skip). I'll PATCH it onto the agent record so it lands in your dashboard automatically — no copy-paste.
 > 6. **Augment the wrapper file** with `@snowglobe_tool` decorators, `tool_defs()`, `TOOLS_MAP`, and a tool-call loop
 > 7. **Verify** with `snowglobe-connect test`, then hand you the deep link to launch a simulation
 >
@@ -93,6 +99,84 @@ The flow is strictly sequential: ask → user answers → resume with the next s
 
 This applies to every user-facing question in the skill. Single in-flight question per turn,
 no side work.
+
+---
+
+## Step 0: Detect the target agent (especially in multi-agent repos)
+
+Before installing or authenticating anything, figure out **which agent the user wants to wire
+up**. Many real projects contain more than one agent definition (multi-agent systems, repos
+with both prod and experimental agents, factories that generate multiple wrappers). Bootstrapping
+the wrong one wastes the user's time and creates a confusing entry in the dashboard.
+
+### a. Honor an explicit hint up front
+
+If the user's invocation already names a file, YAML, or class — e.g. *"set up snowglobe for
+`agents/credit_limit.yaml`"*, *"bootstrap snowglobe using `agent_factory.SnowglobeAgent`"* —
+take that as the target and skip to Step 1. Don't second-guess by scanning.
+
+### b. Otherwise scan for candidates
+
+Run a light scan to see how many plausible agent definitions exist in the repo:
+
+```bash
+# YAML/JSON agent definitions
+find . -type f \( -name "*.yaml" -o -name "*.yml" -o -name "*.json" \) \
+  -not -path "*/node_modules/*" -not -path "*/.venv/*" -not -path "*/.git/*" \
+  | xargs grep -l -i -E "agent|chatbot|assistant|prompt" 2>/dev/null | head -20
+
+# Python files that look like agent definitions / factories / wrappers
+find . -type f -name "*.py" \
+  -not -path "*/node_modules/*" -not -path "*/.venv/*" -not -path "*/.git/*" \
+  | xargs grep -l -E "def completion|class .*Agent|@snowglobe_tool|SnowglobeAgent|system_prompt" 2>/dev/null | head -20
+```
+
+Skim what comes back. A "candidate" is a file that clearly defines an agent's behavior — a
+YAML spec, a class with a system prompt, a `completion()` function, a wrapper file already
+referenced from `.snowglobe/agents.json`, etc. Build a short de-duplicated list.
+
+### c. Decide whether to ask
+
+- **Zero candidates**: proceed to Step 1 normally — there's nothing to disambiguate. You'll
+  scaffold from scratch.
+- **One candidate**: proceed to Step 1, but mention it in your preamble update ("targeting
+  `<path>`") so the user can correct you before install runs.
+- **Two or more candidates**: stop and ask the user before doing anything else. End the turn
+  with only this question:
+
+  > "This repo has multiple agent definitions. Which one should I wire up to Snowglobe?
+  >
+  > 1. `<path/to/agent_one.yaml>` — `<one-line summary lifted from the file>`
+  > 2. `<path/to/agent_two.py>` — `<one-line summary>`
+  > 3. `<path/to/agent_three>` — `<one-line summary>`
+  >
+  > (Reply with the number or the path. If multiple agents share scaffolding and you want
+  > them all wired up, say so — I'll do them one at a time.)"
+
+  After they answer, store the target path and proceed to Step 1. If they pick "all of them,"
+  bootstrap the first one fully, then loop back to Step 3+ for each remaining one (skip the
+  install/auth — those only run once).
+
+### d. Detect project-managed scaffolding
+
+While scanning, also look for project-level scaffolders that already produce Snowglobe
+wrappers — e.g. `_generate_agents.py`, an `agent_factory.SnowglobeAgent`, a Makefile target,
+or wrapper files that delegate to an internal service rather than calling an LLM SDK directly.
+If you find one, that's a third bootstrap mode beyond from-scratch / transforming-existing:
+
+- **Project-managed scaffolding mode**: follow the project's convention. Don't run
+  `snowglobe-connect init` (it would produce a wrapper incompatible with the repo's pattern).
+  Instead, use the existing factory/generator to produce the wrapper, then continue with
+  Steps 4–9 to augment + verify + register.
+
+Surface this to the user in your preamble:
+
+> "I noticed this repo has its own Snowglobe scaffolding (`agent_factory.SnowglobeAgent` /
+> `_generate_agents.py`). I'll follow that pattern instead of `snowglobe-connect init` — it
+> would produce an incompatible standalone wrapper. Want me to proceed?"
+
+If they confirm, set `MODE=project-managed` and skip the `init` substeps in Step 3 (the
+agent still needs to be registered in the dashboard via API; just don't run `init`).
 
 ---
 
@@ -414,8 +498,65 @@ them up front they can skip any question and you'll fall back to your inference.
 Keep the final description to 2–6 sentences. Don't list every tool — describe capabilities at
 the level of user value.
 
-You will present this description to the user in Step 9 and ask them to paste it into the
-Snowglobe dashboard.
+### Save the description to the agent record (don't make the user paste)
+
+Once the description is finalized, **PATCH it onto the agent record** so it lands in the
+dashboard automatically. The user should not have to copy-paste it from the terminal.
+
+You'll need the agent's UUID. In from-scratch mode, you captured the `id` from the POST
+response in Step 3b. In transforming-existing mode, read it from `.snowglobe/agents.json`:
+
+```bash
+AGENT_ID=$(python3 -c "import json; d=json.load(open('.snowglobe/agents.json')); print(next(iter(d.values()))['id'])")
+```
+
+(If `agents.json` lists multiple wrappers, pick the entry whose key matches the wrapper file
+path you've been working with — not just the first entry.)
+
+Then PATCH with the description. Same auth headers as Step 3b — note that in
+transforming-existing mode you skipped Step 3, so `ORG_ID` may not be set yet. If it isn't,
+fetch it the same way Step 3a does (`GET /api/users/me` → first org's id) before the PATCH.
+
+```bash
+KEY=${SNOWGLOBE_API_KEY:-$(grep -m1 '^SNOWGLOBE_API_KEY=' .snowglobe/config.rc | cut -d= -f2)}
+
+if [ -z "$ORG_ID" ]; then
+  ORG_ID=$(curl -sS https://api.snowglobe.guardrailsai.com/api/users/me \
+    -H "x-api-key: $KEY" \
+    | python3 -c "import json,sys; d=json.load(sys.stdin); print((d.get('organizations') or [{}])[0].get('id',''))")
+fi
+
+# Write the description to a temp file to avoid quoting hell with JSON-escaping
+DESC_FILE=$(mktemp)
+cat > "$DESC_FILE" <<'JSON'
+{"description": "<the 2–6 sentence description you drafted, properly JSON-escaped>"}
+JSON
+
+curl -sS -X PATCH "https://api.snowglobe.guardrailsai.com/api/agents/$AGENT_ID" \
+  -H "x-api-key: $KEY" \
+  -H "x-snowglobe-org-id: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  --data-binary @"$DESC_FILE"
+
+rm "$DESC_FILE"
+```
+
+(In practice you'll build the JSON body in your tool call rather than running a heredoc —
+the shape is `{"description": "..."}`.)
+
+**Verify the response.** A successful PATCH returns the updated agent object. Confirm
+`description` in the response matches what you sent. If the response has an empty/missing
+`description` or a non-2xx status, surface the error to the user and fall back to the
+manual paste flow (show the description, point them at the dashboard URL).
+
+**Common failures:**
+- `404` — wrong `AGENT_ID`. Re-read it from `agents.json` and retry.
+- `401`/`403` — same auth issue as Step 3b. Re-run `snowglobe-connect auth`.
+- `422` — description failed validation (too long, bad characters). Show the error and
+  trim/sanitize the description before retrying.
+
+After a successful PATCH, you can skip the "paste this into the dashboard" line in Step 9 —
+just confirm to the user that the description was set, and still show it for their records.
 
 ---
 
@@ -879,8 +1020,11 @@ Tell the user:
    - The wrapper file path (with `# TODO` markers flagged)
    - `.snowglobe/agents.json` entry (from `init`)
 
-2. **The drafted chatbot description.** Show it as a quoted block and tell them to paste it
-   into the dashboard at the agent URL (next bullet).
+2. **The chatbot description** — the one you set on the agent via PATCH in Step 6. Show it
+   as a quoted block so the user has it for their records and can tweak it if they want.
+   Make clear that it's **already live in the dashboard** — no paste required. (If the PATCH
+   failed in Step 6 and you fell back to the manual flow, instead tell them to paste it into
+   the dashboard at the agent URL below.)
 
 3. **Ask them to double-check the wrapper works** — particularly the tool implementations
    you stubbed. Recommend a quick smoke run if they have a real provider key.
@@ -911,6 +1055,10 @@ Tell the user:
 - Don't return `CompletionFunctionOutputs(content=...)` — the field is named `response`.
 - Don't ask the user to paste their agent UUID. Step 3 handles UUID acquisition automatically:
   for new agents via `POST /api/agents`, for existing via `init` matching by name.
+- Don't ask the user to paste the chatbot description into the dashboard. Step 6 PATCHes it
+  onto the agent record (`PATCH /api/agents/<id>` with `{"description": "..."}`) so it lands
+  in the dashboard automatically. Manual paste is the fallback only if the PATCH genuinely
+  fails (non-2xx) — and even then, surface the failure rather than silently degrading.
 - Don't try to create a new agent via `snowglobe-connect init` — `init` only picks from
   existing dashboard agents. New agents must be created via `POST https://api.snowglobe.guardrailsai.com/api/agents`
   first (headers: `x-api-key: $SNOWGLOBE_API_KEY` **and** `x-snowglobe-org-id: <org-id>`,
